@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Rescue Chase</title>
+<style>
+body { margin:0; background:#0b0f14; overflow:hidden; }
+canvas { display:block; margin:auto; background:#111820; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+canvas.width = 1000;
+canvas.height = 600;
+
+/* ---------- UTIL ---------- */
+const lerp = (a,b,t)=>a+(b-a)*t;
+const dist = (a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+
+/* ---------- CAMERA ---------- */
+const camera = { x:0, y:0 };
+
+/* ---------- PLAYER ---------- */
+const player = {
+  x:200, y:200,
+  vx:0, vy:0,
+  speed:0.6,
+  rescued:null
+};
+
+/* ---------- NPC ---------- */
+let npc = {
+  x:500, y:350,
+  name:"Rasel",
+  rescued:false
+};
+
+/* ---------- SAFE ZONE ---------- */
+const safeZone = { x:850, y:500, r:35 };
+
+/* ---------- POLICE ---------- */
+let police = [
+  { x:700, y:100, vx:0, vy:0, speed:0.8 },
+  { x:100, y:500, vx:0, vy:0, speed:0.8 }
+];
+
+/* ---------- INPUT ---------- */
+const keys = {};
+onkeydown = e=>keys[e.key]=true;
+onkeyup = e=>keys[e.key]=false;
+
+/* ---------- UPDATE ---------- */
+function update(){
+  let tx = 0, ty = 0;
+  if(keys["ArrowUp"]) ty=-1;
+  if(keys["ArrowDown"]) ty=1;
+  if(keys["ArrowLeft"]) tx=-1;
+  if(keys["ArrowRight"]) tx=1;
+
+  player.vx = lerp(player.vx, tx*player.speed, 0.15);
+  player.vy = lerp(player.vy, ty*player.speed, 0.15);
+
+  player.x += player.vx*10;
+  player.y += player.vy*10;
+
+  // Rescue
+  if(!npc.rescued && dist(player,npc)<30){
+    npc.rescued = true;
+    player.rescued = npc;
+  }
+
+  // Escort follow
+  if(npc.rescued){
+    npc.x = lerp(npc.x, player.x-20, 0.05);
+    npc.y = lerp(npc.y, player.y-20, 0.05);
+  }
+
+  // Police AI
+  police.forEach(p=>{
+    const d = dist(p,player);
+    if(d<200){
+      const ang = Math.atan2(player.y-p.y,player.x-p.x);
+      p.vx = lerp(p.vx, Math.cos(ang)*p.speed, 0.1);
+      p.vy = lerp(p.vy, Math.sin(ang)*p.speed, 0.1);
+    } else {
+      p.vx *= 0.98;
+      p.vy *= 0.98;
+    }
+    p.x += p.vx*8;
+    p.y += p.vy*8;
+
+    if(dist(p,player)<20){
+      alert("GAME OVER");
+      location.reload();
+    }
+  });
+
+  // Win
+  if(player.rescued && dist(player,safeZone)<safeZone.r){
+    alert("LEVEL COMPLETE!");
+    location.reload();
+  }
+
+  // Camera
+  camera.x = lerp(camera.x, player.x-canvas.width/2, 0.05);
+  camera.y = lerp(camera.y, player.y-canvas.height/2, 0.05);
+}
+
+/* ---------- DRAW ---------- */
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save();
+  ctx.translate(-camera.x,-camera.y);
+
+  // City roads
+  ctx.strokeStyle="#1f2a38";
+  ctx.lineWidth=40;
+  ctx.beginPath();
+  ctx.moveTo(100,100);
+  ctx.quadraticCurveTo(500,50,900,300);
+  ctx.stroke();
+
+  // Buildings
+  ctx.fillStyle="#18222f";
+  ctx.fillRect(300,250,120,160);
+  ctx.fillRect(600,400,160,120);
+
+  // Safe zone
+  ctx.fillStyle="#145a32";
+  ctx.beginPath();
+  ctx.arc(safeZone.x,safeZone.y,safeZone.r,0,Math.PI*2);
+  ctx.fill();
+
+  // NPC
+  ctx.fillStyle="#c9d1d9";
+  ctx.beginPath();
+  ctx.arc(npc.x,npc.y,10,0,Math.PI*2);
+  ctx.fill();
+  ctx.fillText(npc.name,npc.x-15,npc.y-15);
+
+  // Player
+  ctx.fillStyle="#58a6ff";
+  ctx.beginPath();
+  ctx.arc(player.x,player.y,12,0,Math.PI*2);
+  ctx.fill();
+
+  // Police
+  ctx.fillStyle="#ff4d4d";
+  police.forEach(p=>{
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,12,0,Math.PI*2);
+    ctx.fill();
+  });
+
+  ctx.restore();
+}
+
+/* ---------- LOOP ---------- */
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
